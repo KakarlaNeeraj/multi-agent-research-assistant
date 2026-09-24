@@ -1,0 +1,75 @@
+# ==========================================
+# Confidential & Sensitive Credentials
+# ==========================================
+.env
+.env.*
+.env.local
+!.env.example
+*.key
+*.pem
+*.secret
+*.token
+.streamlit/secrets.toml
+
+# ==========================================
+# PDF Documents & Exported Reports
+# ==========================================
+*.pdf
+MultiAgent_Research_Assistant_Project_Guide.pdf
+*.docx
+*.pptx
+*.xlsx
+*.csv
+
+# ==========================================
+# Generated Research Outputs & Logs
+# ==========================================
+outputs/
+reports/
+data/
+logs/
+*.log
+
+# ==========================================
+# Python Bytecode, Caches & Virtual Envs
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ==========================================
+# Operating System & IDE Configs
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+__MACOSX/
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
