@@ -43,6 +43,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Secret retrieval helper (supports Streamlit Secrets & .env)
+def get_secret(key: str, default: str = "") -> str:
+    try:
+        if key in st.secrets:
+            return str(st.secrets[key]).strip()
+    except Exception:
+        pass
+    return os.getenv(key, default).strip()
+
+
 # Helper function to create LLM caller
 def get_llm_caller(provider: str, api_key: str, model_name: str, base_url: str = ""):
     if provider in ["Groq (Ultra-Fast)", "OpenAI", "Local LLM (Ollama / LM Studio / vLLM / Custom)"]:
@@ -51,18 +61,17 @@ def get_llm_caller(provider: str, api_key: str, model_name: str, base_url: str =
             client_kwargs = {}
             if provider.startswith("Groq"):
                 client_kwargs["base_url"] = "https://api.groq.com/openai/v1"
-                client_kwargs["api_key"] = api_key.strip() if api_key else os.getenv("GROQ_API_KEY", "")
+                client_kwargs["api_key"] = api_key.strip() if api_key else get_secret("GROQ_API_KEY", "")
                 target_model = model_name.strip() if model_name else "qwen/qwen3.8-27b"
             elif base_url:
                 client_kwargs["base_url"] = base_url.strip()
                 if api_key:
                     client_kwargs["api_key"] = api_key.strip()
                 elif provider.startswith("Local"):
-                    client_kwargs["api_key"] = "local-api-key"
+                    client_kwargs["api_key"] = get_secret("LOCAL_LLM_API_KEY", "local-api-key")
                 target_model = model_name.strip() if model_name else "gemini-2.5-flash"
             else:
-                if api_key:
-                    client_kwargs["api_key"] = api_key.strip()
+                client_kwargs["api_key"] = api_key.strip() if api_key else get_secret("OPENAI_API_KEY", "")
                 target_model = model_name.strip() if model_name else "gpt-4o-mini"
 
             if not client_kwargs.get("api_key"):
@@ -98,11 +107,12 @@ def get_llm_caller(provider: str, api_key: str, model_name: str, base_url: str =
             return None
 
     elif provider == "Google Gemini":
-        if not api_key:
+        active_key = api_key.strip() if api_key else get_secret("GEMINI_API_KEY", "")
+        if not active_key:
             return None
         try:
             import google.generativeai as genai
-            genai.configure(api_key=api_key)
+            genai.configure(api_key=active_key)
             model = genai.GenerativeModel(model_name or "gemini-1.5-flash")
             def call_gemini(system_prompt: str, user_prompt: str) -> str:
                 prompt = f"{system_prompt}\n\nUser Request:\n{user_prompt}"
@@ -139,11 +149,14 @@ with st.sidebar:
     local_base_url = ""
 
     if llm_provider == "Groq (Ultra-Fast)":
-        api_key = st.text_input(
-            "Groq API Key",
-            type="password",
-            value=os.getenv("GROQ_API_KEY", "")
-        )
+        system_groq_key = get_secret("GROQ_API_KEY")
+        if system_groq_key:
+            st.caption("🔒 *System API Key active (hidden for security)*")
+            custom_groq = st.text_input("Override API Key (Optional)", type="password", placeholder="Leave empty to use system key")
+            api_key = custom_groq.strip() if custom_groq else system_groq_key
+        else:
+            api_key = st.text_input("Groq API Key", type="password", placeholder="gsk_...")
+
         model_choice = st.selectbox(
             "Groq Model",
             [
@@ -156,7 +169,7 @@ with st.sidebar:
     elif llm_provider == "Local LLM (Ollama / LM Studio / vLLM / Custom)":
         local_base_url = st.text_input(
             "Local Endpoint (Base URL)",
-            value=os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:3001/v1"),
+            value=get_secret("LOCAL_LLM_BASE_URL", "http://localhost:3001/v1"),
             help="Common examples:\n- FreeLLM / Custom: http://localhost:3001/v1\n- Ollama: http://localhost:11434/v1\n- LM Studio: http://localhost:1234/v1\n- vLLM / LocalAI: http://localhost:8000/v1"
         )
         local_model_preset = st.selectbox(
@@ -175,19 +188,42 @@ with st.sidebar:
         else:
             model_choice = local_model_preset
 
-        api_key = st.text_input(
-            "API Key (Optional for Local)",
-            type="password",
-            value=os.getenv("LOCAL_LLM_API_KEY", "")
-        )
+        system_local_key = get_secret("LOCAL_LLM_API_KEY")
+        if system_local_key:
+            st.caption("🔒 *System API Key active (hidden)*")
+            custom_local = st.text_input("Override API Key (Optional)", type="password", placeholder="Leave empty to use system key")
+            api_key = custom_local.strip() if custom_local else system_local_key
+        else:
+            api_key = st.text_input("API Key (Optional for Local)", type="password", placeholder="local-api-key")
+
     elif llm_provider == "OpenAI":
-        api_key = st.text_input("OpenAI API Key", type="password", value=os.getenv("OPENAI_API_KEY", ""))
+        system_openai_key = get_secret("OPENAI_API_KEY")
+        if system_openai_key:
+            st.caption("🔒 *System API Key active (hidden)*")
+            custom_openai = st.text_input("Override API Key (Optional)", type="password", placeholder="Leave empty to use system key")
+            api_key = custom_openai.strip() if custom_openai else system_openai_key
+        else:
+            api_key = st.text_input("OpenAI API Key", type="password", placeholder="sk-...")
         model_choice = st.selectbox("Model", ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"])
+
     elif llm_provider == "Google Gemini":
-        api_key = st.text_input("Gemini API Key", type="password", value=os.getenv("GEMINI_API_KEY", ""))
+        system_gemini_key = get_secret("GEMINI_API_KEY")
+        if system_gemini_key:
+            st.caption("🔒 *System API Key active (hidden)*")
+            custom_gemini = st.text_input("Override API Key (Optional)", type="password", placeholder="Leave empty to use system key")
+            api_key = custom_gemini.strip() if custom_gemini else system_gemini_key
+        else:
+            api_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
         model_choice = st.selectbox("Model", ["gemini-1.5-flash", "gemini-1.5-pro"])
         
-    tavily_key = st.text_input("Tavily API Key (Optional)", type="password", value=os.getenv("TAVILY_API_KEY", ""), help="If left empty, defaults to DuckDuckGo search automatically.")
+    system_tavily = get_secret("TAVILY_API_KEY")
+    if system_tavily:
+        st.caption("🔒 *Tavily Search Key active*")
+        custom_tavily = st.text_input("Override Tavily Key (Optional)", type="password", placeholder="Leave empty to use system key")
+        tavily_key = custom_tavily.strip() if custom_tavily else system_tavily
+    else:
+        tavily_key = st.text_input("Tavily API Key (Optional)", type="password", placeholder="tvly-...", help="If left empty, defaults to DuckDuckGo search automatically.")
+
     if tavily_key:
         os.environ["TAVILY_API_KEY"] = tavily_key
 
